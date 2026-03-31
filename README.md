@@ -33,6 +33,7 @@ Después de copiar `.env.example` a `.env`, edita los valores según tu entorno.
 | Variable | Obligatoria | Descripción | Ejemplo |
 |----------|-----------|-------------|---------|
 | `OPENAI_API_KEY` | ✅ Sí | API key de OpenAI para clasificación de sentimiento. Obtén en https://platform.openai.com/api-keys | `sk-proj-xxxxx...` |
+| `OPENAI_MODEL` | ⚠️ Opcional | Modelo de OpenAI a utilizar para la clasificación de sentimiento. Modelos disponibles: `gpt-4o`, `gpt-4-turbo`, `gpt-4o-mini` (default, más económico), `gpt-3.5-turbo` (rápido pero menos preciso) | `gpt-4o-mini` |
 
 ### Gmail Configuration
 
@@ -69,6 +70,7 @@ Después de copiar `.env.example` a `.env`, edita los valores según tu entorno.
 ```env
 # OpenAI
 OPENAI_API_KEY=sk-proj-your-api-key-here
+OPENAI_MODEL=gpt-4o-mini
 
 # Gmail
 GMAIL_CREDENTIALS_FILE=credentials.json
