@@ -19,6 +19,11 @@ class Settings:
     csv_prefix: str
     min_score_descontento: float
     log_level: str
+    
+    def validate_min_score(self) -> None:
+        """Valida que min_score_descontento esté en rango válido (0.0-1.0)."""
+        if not (0.0 <= self.min_score_descontento <= 1.0):
+            raise ValueError(f"MIN_SCORE_DESCONTENTO debe estar entre 0.0 y 1.0, got {self.min_score_descontento}")
 
 
 def load_settings() -> Settings:

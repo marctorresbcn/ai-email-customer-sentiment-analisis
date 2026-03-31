@@ -7,11 +7,12 @@ from ports import EmailSource, SentimentAnalyzer
 
 
 class ClientSatisfactionPipeline:
-    def __init__(self, email_source: EmailSource, sentiment_analyzer: SentimentAnalyzer, output_dir: str = "output", csv_prefix: str = "clients"):
+    def __init__(self, email_source: EmailSource, sentiment_analyzer: SentimentAnalyzer, output_dir: str = "output", csv_prefix: str = "clients", min_score_descontento: float = 0.60):
         self.email_source = email_source
         self.sentiment_analyzer = sentiment_analyzer
         self.output_dir = output_dir
         self.csv_prefix = csv_prefix
+        self.min_score_descontento = min_score_descontento
 
     def _ensure_output_dir(self) -> None:
         os.makedirs(self.output_dir, exist_ok=True)
@@ -50,8 +51,9 @@ class ClientSatisfactionPipeline:
 
                 sentiment_result = self.sentiment_analyzer.analyze(email.body)
 
-                if only_descontento and sentiment_result.sentimiento != "descontento":
-                    continue
+                if only_descontento:
+                    if sentiment_result.sentimiento != "descontento" or sentiment_result.score < self.min_score_descontento:
+                        continue
 
                 writer.writerow(
                     {

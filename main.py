@@ -13,6 +13,12 @@ def main() -> None:
     parser.add_argument(
         "--only-descontento", action="store_true", help="Solo exportar correos con sentimiento descontento"
     )
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        help="Score mínimo para considerar un correo descontento (0.0-1.0, default: 0.60)",
+        default=None,
+    )
     
     # Filtros de fecha
     date_group = parser.add_mutually_exclusive_group()
@@ -59,7 +65,12 @@ def main() -> None:
     settings = load_settings()
     if args.max_emails:
         settings.max_emails = args.max_emails
-
+    if args.min_score is not None:
+        settings.min_score_descontento = args.min_score
+    
+    # Validar que el score esté en rango válido
+    settings.validate_min_score()
+    
     if not settings.openai_api_key:
         raise ValueError("OPENAI_API_KEY no está configurado en .env")
 
@@ -106,6 +117,7 @@ def main() -> None:
         sentiment_analyzer=sentiment_analyzer,
         output_dir=settings.output_dir,
         csv_prefix=settings.csv_prefix,
+        min_score_descontento=settings.min_score_descontento,
     )
 
     pipeline.run(max_emails=settings.max_emails, only_descontento=args.only_descontento)

@@ -1,275 +1,290 @@
-# Detector de correos de clientes descontentos
+# 📧 Analizador de Sentimiento de Emails de Clientes
 
-Este proyecto lee correos de Gmail (Google Workspace), analiza el texto con OpenAI y genera un fichero CSV con el resultado.
+Herramienta para detectar clientes descontentos automáticamente leyendo emails de Gmail y analizándolos con OpenAI.
 
-## 📋 Índice de contenidos
-
-1. [Requisitos](#requisitos)
-2. [Configuración de variables (.env)](#configuración-de-variables-env)
-3. [Uso](#uso)
-4. [Obtener TODOS los correos de la cuenta](#obtener-todos-los-correos-de-la-cuenta)
-5. [Estructura del CSV](#estructura-del-csv)
-6. [Notas de privacidad](#notas-de-privacidad)
+**Uso perfecto para:** e-commerce, customer support, análisis de reclamaciones, detección de problemas de servicio.
 
 ---
 
-## Requisitos
+## ⚡ Quick Start (5 minutos)
 
-1. Python 3.10+
-2. `pip install -r requirements.txt`
-3. Preparar credenciales de Gmail API:
-   - Crear proyecto en Google Cloud Console.
-   - Habilitar Gmail API.
-   - Descarga `credentials.json` y colócala en la raíz del proyecto.
+### 1. Instalación
 
-4. Copiar `.env.example` a `.env` y configurar tus variables.
+```bash
+# Clonar y entrar
+git clone https://github.com/marctorresbcn/ai-email-customer-sentiment-analisis.git
+cd ai-email-customer-sentiment-analisis
 
-## Configuración de variables (.env)
-
-Después de copiar `.env.example` a `.env`, edita los valores según tu entorno. Aquí está la descripción completa de cada variable:
-
-### OpenAI Configuration
-
-| Variable | Obligatoria | Descripción | Ejemplo |
-|----------|-----------|-------------|---------|
-| `OPENAI_API_KEY` | ✅ Sí | API key de OpenAI para clasificación de sentimiento. Obtén en https://platform.openai.com/api-keys | `sk-proj-xxxxx...` |
-| `OPENAI_MODEL` | ⚠️ Opcional | Modelo de OpenAI a utilizar para la clasificación de sentimiento. Modelos disponibles: `gpt-4o`, `gpt-4-turbo`, `gpt-4o-mini` (default, más económico), `gpt-3.5-turbo` (rápido pero menos preciso) | `gpt-4o-mini` |
-
-### Gmail Configuration
-
-| Variable | Obligatoria | Descripción | Ejemplo |
-|----------|-----------|-------------|---------|
-| `GMAIL_CREDENTIALS_FILE` | ✅ Sí | Ruta al archivo `credentials.json` descargado de Google Cloud Console | `credentials.json` |
-| `GMAIL_TOKEN_FILE` | ⚠️ Opcional | Nombre del archivo donde se guarda el token de autorización (se crea automáticamente en primer uso) | `token.json` |
-| `GMAIL_USER_ID` | ⚠️ Opcional | ID del usuario (casi siempre `me` para tu propia cuenta) | `me` |
-| `GMAIL_LABELS` | ⚠️ Opcional | Etiquetas/carpetas de Gmail a buscar, separadas por comas. `INBOX` es la carpeta predeterminada | `INBOX` o `INBOX,SENT,ARCHIVE` |
-| `GMAIL_QUERY` | ⚠️ Opcional | Consulta adicional de Gmail (sintaxis nativa de Gmail). Se combina con los filtros CLI | `filename:pdf` o vacío |
-
-### Processing Configuration
-
-| Variable | Obligatoria | Descripción | Ejemplo |
-|----------|-----------|-------------|---------|
-| `MAX_EMAILS` | ⚠️ Opcional | Número máximo de correos a procesar por defecto. Puede ser sobrescrito con `--max-emails` CLI | `100` |
-| `MIN_SCORE_DESCONTENTO` | ⚠️ Opcional | Score mínimo (0.0 a 1.0) para considerar un email como "descontento". Valores cercanos a 1.0 son más estrictos | `0.60` |
-| `KEYWORDS_FILTER` | ⚠️ Opcional | Palabras clave separadas por comas para filtrar correos. Solo se procesan correos cuyo asunto coincida con estas palabras. Útil para descartar categorías no relevantes (ej: facturas, confirmaciones automáticas). Se puede sobrescribir con `--keywords` en CLI | `pedidos,devoluciones,tallas,returns,exchange` |
-
-### Output Configuration
-
-| Variable | Obligatoria | Descripción | Ejemplo |
-|----------|-----------|-------------|---------|
-| `OUTPUT_DIR` | ⚠️ Opcional | Directorio donde se guardan los CSV generados | `output` |
-| `CSV_PREFIX` | ⚠️ Opcional | Prefijo del archivo CSV de salida. El nombre final será `{CSV_PREFIX}_YYYYMMDD_HHMMSS.csv` | `clients` |
-
-### Logging Configuration
-
-| Variable | Obligatoria | Descripción | Ejemplo |
-|----------|-----------|-------------|---------|
-| `LOG_LEVEL` | ⚠️ Opcional | Nivel de logs a mostrar: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` | `INFO` |
-
-### Ejemplo de .env completo
-
-```env
-# OpenAI
-OPENAI_API_KEY=sk-proj-your-api-key-here
-OPENAI_MODEL=gpt-4o-mini
-
-# Gmail
-GMAIL_CREDENTIALS_FILE=credentials.json
-GMAIL_TOKEN_FILE=token.json
-GMAIL_USER_ID=me
-GMAIL_LABELS=INBOX
-GMAIL_QUERY=
-
-# Processing
-MAX_EMAILS=100
-MIN_SCORE_DESCONTENTO=0.60
-KEYWORDS_FILTER=pedidos,devoluciones,tallas,returns,exchange
-
-# Output
-OUTPUT_DIR=output
-CSV_PREFIX=clients
-
-# Logging
-LOG_LEVEL=INFO
+# Instalar dependencias
+pip install -r requirements.txt
 ```
 
----
+### 2. Configuración
 
-## Uso
+```bash
+# Copiar archivo de ejemplo
+cp .env.example .env
+
+# Editar .env con tus credenciales
+nano .env  # o abre con tu editor favorito
+```
+
+**Rellenar solo 2 campos (obligatorios):**
+- `OPENAI_API_KEY` → Obtén en https://platform.openai.com/api-keys
+- `GMAIL_CREDENTIALS_FILE` → Descarga `credentials.json` desde Google Cloud Console
+
+### 3. Ejecutar
 
 ```bash
 python main.py --max-emails 50
 ```
 
-### Opciones de límite de emails
-
-- `--max-emails`: número máximo de correos a procesar (por defecto `100`).
-
-### Filtros de fecha
-
-Puedes usar uno de los siguientes filtros (mutuamente excluyentes):
-
-- `--from-date YYYY-MM-DD`: desde esa fecha hasta ahora.
-  ```bash
-  python main.py --from-date 2026-03-01
-  ```
-
-- `--date-range YYYY-MM-DD YYYY-MM-DD`: rango específico de fechas.
-  ```bash
-  python main.py --date-range 2026-03-01 2026-03-31
-  ```
-
-- `--preset-range {last_week|last_month|last_three_months|last_year}`: rango predefinido.
-  ```bash
-  python main.py --preset-range last_month
-  ```
-
-### Filtro de destinatario
-
-- `--to email@domain.com`: correos dirigidos a un email específico (útil para alias corporativos).
-  ```bash
-  python main.py --to support@empresa.com
-  ```
-
-### Filtro de palabras clave
-
-- `--keywords palabra1,palabra2,palabra3`: filtra correos cuyo asunto contiene estas palabras clave. Útil para descartar categorías no relevantes (ej: facturas, confirmaciones automáticas) y enfocarse solo en la comunicación relacionada con satisfacción del cliente.
-  ```bash
-  python main.py --keywords pedidos,devoluciones,tallas,returns,exchange
-  ```
-
-**Ejemplo para tienda barefoot:** Filtra solo correos sobre pedidos, cambios, devoluciones y problemas de talla:
-```bash
-python main.py --keywords "pedidos,cambios,devoluciones,returns,exchange,tallas,reclamación,problema envío" --max-emails 300
-```
-
-**Nota:** Las palabras clave también pueden configurarse en el archivo `.env` con la variable `KEYWORDS_FILTER`. Si se especifican tanto en `.env` como en CLI, prevalece el valor de CLI.
-
-### Filtro de sentimiento
-
-- `--only-descontento`: exporta solo correos clasificados como descontento.
-  ```bash
-  python main.py --max-emails 100 --only-descontento
-  ```
-
-### Ejemplos combionados
-
-```bash
-# Último mes, solo a alias de soporte, máximo 200 emails
-python main.py --preset-range last_month --to support@empresa.com --max-emails 200
-
-# Rango específico, solo descontentos
-python main.py --date-range 2026-03-01 2026-03-31 --only-descontento
-
-# Desde una fecha específica a un destinatario
-python main.py --from-date 2026-01-01 --to sales@empresa.com
-```
-
-### Combinación de filtros
-
-Los filtros se pueden combinar de la siguiente manera:
-
-| Combinación | Ejemplo | Estado |
-|-------------|---------|--------|
-| **Fecha + Destinatario** | `--preset-range last_month --to support@empresa.com` | ✅ Permitido |
-| **Fecha + Máximo emails** | `--from-date 2026-01-01 --max-emails 100` | ✅ Permitido |
-| **Fecha + Palabras clave** | `--date-range 2026-03-01 2026-03-31 --keywords pedidos,devoluciones` | ✅ Permitido |
-| **Palabras clave + Destinatario** | `--keywords tallas,returns --to support@empresa.com` | ✅ Permitido |
-| **Palabras clave + Solo descontentos** | `--keywords pedidos,envío --only-descontento` | ✅ Permitido |
-| **Destinatario + Máximo** | `--to sales@empresa.com --max-emails 50` | ✅ Permitido |
-| **Múltiples flags complejos** | `--preset-range last_week --to support@empresa.com --keywords pedidos,devoluciones --max-emails 500 --only-descontento` | ✅ Permitido |
-
-**Nota:** Los filtros de fecha son mutuamente excluyentes (solo uno a la vez). No se pueden combinar `--from-date`, `--date-range` y `--preset-range` entre sí.
+**Salida:** `output/clients_YYYYMMDD_HHMMSS.csv`
 
 ---
 
-Si deseas procesar **todos los correos** de tu buzón (sin filtros específicos), tienes dos opciones:
+## 📚 Ejemplos de uso (de simple a complejo)
 
-### Opción 1: Sin filtros CLI (recomendado para empezar)
-
-```bash
-python main.py --max-emails 500
-```
-
-Esto obtendrá **hasta 500 correos de la carpeta INBOX** (valor por defecto).
-
-### Opción 2: Búsqueda desde el inicio del tiempo
-
-Para obtener **prácticamente todos los correos históricos**, usa una fecha muy antigua:
-
-```bash
-python main.py --from-date 2000-01-01 --max-emails 10000
-```
-
-Esto obtiene todos los correos desde el año 2000 hasta ahora, limitados a 10.000 (puedes aumentar el límite según necesites).
-
-### Opción 3: Cambiar etiquetas/carpetas en `.env`
-
-Si quieres incluir **múltiples carpetas** (INBOX, SENT, ARCHIVE, etc.), modifica tu archivo `.env`:
-
-```env
-GMAIL_LABELS=INBOX,SENT,ARCHIVE,ALL_MAIL
-MAX_EMAILS=10000
-```
-
-Luego ejecuta:
+### Ejemplo 1: Procesar últimas 100 mails
 
 ```bash
 python main.py
 ```
 
-Esto procesará todos los correos de las carpetas especificadas.
+### Ejemplo 2: Último mes, solo clientes descontentos
 
-### Opción 4: Usar GMAIL_QUERY para búsquedas avanzadas
-
-Para una búsqueda más precisa, puedes agregar una `GMAIL_QUERY` en tu `.env`:
-
-```env
-# Buscar todos excepto spam/basura
-GMAIL_QUERY=is:unspam -is:chat
-
-# Buscar desde una fecha específica
-GMAIL_QUERY=after:2025-01-01
-
-# Buscar correos con adjuntos
-GMAIL_QUERY=has:attachment
+```bash
+python main.py --preset-range last_month --only-descontento
 ```
 
-La sintaxis completa de búsqueda de Gmail está disponible en: https://support.google.com/mail/answer/7190
+### Ejemplo 3: Tienda barefoot - filtrar por categoría
 
-### ⚠️ Consideraciones importantes
+Procesa solo correos sobre: pedidos, devoluciones, tallas, cambios, problemas de envío.
 
-- **Cuota de API**: Google limita a 1 millón de emails/día aproximadamente. Para búsquedas masivas, distribuye en varias ejecuciones.
-- **Costo de OpenAI**: Cada email clasificado consume tokens. Con 10.000 emails y un modelo como `gpt-4o-mini`, el costo estimado es bajo, pero ten presente que cada token tiene un costo.
-- **Tiempo de ejecución**: Procesar 10.000+ emails puede tomar horas dependiendo de la proxies y el modelo OpenAI.
+```bash
+python main.py \
+  --keywords "pedidos,devoluciones,tallas,cambios,returns,exchange,problema envío" \
+  --preset-range last_month \
+  --max-emails 300
+```
 
-### Salida
+### Ejemplo 4: Búsqueda a alias de soporte específico
 
-El resultado se genera en:
-- `output/clients_<YYYYMMDD_HHMMSS>.csv`
+```bash
+python main.py \
+  --to support@empresa.com \
+  --from-date 2026-01-01 \
+  --max-emails 500 \
+  --only-descontento \
+  --min-score 0.75
+```
 
-Ejemplo: `output/clients_20260331_143501.csv`
+### Ejemplo 5: Obtener TODOS los emails históricos
 
-## Estructura del CSV
-
-- `fecha_email`: Fecha del correo en formato ISO
-- `remitente`: Dirección de email del remitente
-- `asunto`: Asunto del correo
-- `sentimiento`: Clasificación (`descontento`, `neutral`, `contento`)
-- `score`: Puntuación de confianza (0.0 a 1.0)
-- `evidencia`: Fragmento del texto o razón de la clasificación
-- `id_email`: ID único de Gmail
-- `thread_id`: ID del hilo de conversación
+```bash
+python main.py --from-date 2000-01-01 --max-emails 50000
+```
 
 ---
 
-## Notas de privacidad
+## 🔧 Referencia de parámetros CLI
 
-⚠️ Este proyecto usa el endpoint de OpenAI para clasificación mediante prompt. **Esto significa que el contenido de los correos se envía a los servidores de OpenAI**.
+| Flag | Tipo | Descripción | Ejemplo |
+|------|------|-------------|---------|
+| `--max-emails` | Número | Máximo emails a procesar (default: 100) | `--max-emails 500` |
+| `--from-date` | Fecha | Desde esta fecha hasta ahora (YYYY-MM-DD) | `--from-date 2026-01-01` |
+| `--date-range` | 2 Fechas | Rango específico (YYYY-MM-DD YYYY-MM-DD) | `--date-range 2026-03-01 2026-03-31` |
+| `--preset-range` | Opción | Rango predefinido | `--preset-range last_month` |
+| `--to` | Email | Correos dirigidos a este alias | `--to support@empresa.com` |
+| `--keywords` | Texto | Palabras clave en asunto (separadas por comas) | `--keywords pedidos,returns,tallas` |
+| `--only-descontento` | Flag | Solo exportar clientes descontentos | (sin argumento) |
+| `--min-score` | Número | Score mínimo para "descontento" (0.0-1.0) | `--min-score 0.75` |
 
-Antes de usar este proyecto con datos sensibles o corporativos:
-1. **Revisa tu acuerdo de privacidad** con OpenAI
-2. **Consulta con tu equipo legal/compliance** sobre el tratamiento de datos
-3. **Considera usar el modelo `gpt-4o-mini`** (más económico y rápido)
-4. **Revisa las políticas de retención** de OpenAI (por defecto, los datos se retienen y pueden usarse para entrenar)
-5. **Anonimiza datos sensibles** si es posible antes de procesar
+**Notas:**
+- Los rangos de **fecha son excluyentes** entre sí: usa solo uno (`--from-date` O `--date-range` O `--preset-range`)
+- Los demás parámetros pueden combinarse libremente
+- CLI sobrescribe valores del `.env`
+
+---
+
+## ⚙️ Variables de configuración (.env)
+
+### Mínimas requeridas
+
+| Variable | Descripción |
+|----------|-------------|
+| `OPENAI_API_KEY` | API key de OpenAI (https://platform.openai.com/api-keys) |
+| `GMAIL_CREDENTIALS_FILE` | Ruta a `credentials.json` (Google Cloud Console) |
+
+### Recomendadas
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `OPENAI_MODEL` | Modelo OpenAI a usar | `gpt-4o-mini` |
+| `MAX_EMAILS` | Máximo emails por ejecución | `100` |
+| `MIN_SCORE_DESCONTENTO` | Score mínimo para marcar como "descontento" (0.0-1.0) | `0.60` |
+| `KEYWORDS_FILTER` | Palabras clave para filtrar asuntos (comas separadas) | (vacío) |
+| `GMAIL_LABELS` | Carpetas a buscar (comas separadas) | `INBOX` |
+| `CSV_PREFIX` | Prefijo del archivo de salida | `clients` |
+
+### Avanzadas
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `GMAIL_TOKEN_FILE` | Archivo para guardar token OAuth | `token.json` |
+| `GMAIL_USER_ID` | ID del usuario Gmail | `me` |
+| `GMAIL_QUERY` | Query nativa de Gmail | (vacío) |
+| `OUTPUT_DIR` | Directorio de salida | `output` |
+| `LOG_LEVEL` | Nivel de logs | `INFO` |
+
+### Ejemplo .env completo
+
+```env
+# Obligatorio
+OPENAI_API_KEY=sk-proj-your-key-here
+GMAIL_CREDENTIALS_FILE=credentials.json
+
+# Opcional (recomendado rellenar)
+OPENAI_MODEL=gpt-4o-mini
+MAX_EMAILS=100
+MIN_SCORE_DESCONTENTO=0.60
+KEYWORDS_FILTER=pedidos,devoluciones,tallas,returns,exchange
+GMAIL_LABELS=INBOX
+
+# Output
+OUTPUT_DIR=output
+CSV_PREFIX=clients
+LOG_LEVEL=INFO
+```
+
+---
+
+## 📊 Estructura del CSV de salida
+
+**Ejemplo de archivo generado:** `output/clients_20260331_143501.csv`
+
+| Campo | Descripción | Ejemplo |
+|-------|-------------|---------|
+| `fecha_email` | Fecha del correo (ISO format) | `2026-03-31T14:35:00Z` |
+| `remitente` | Email del remitente | `cliente@tienda.com` |
+| `asunto` | Subject del correo | `Mi pedido no llegó a tiempo` |
+| `sentimiento` | Clasificación | `descontento` / `neutral` / `contento` |
+| `score` | Confianza del análisis (0.0-1.0) | `0.92` |
+| `evidencia` | Fragmento que justifica la clasificación | `"No me llegó a tiempo y me decepcionó"` |
+| `id_email` | ID único de Gmail | `18a3c5d234f5e1a2` |
+| `thread_id` | ID del hilo de conversación | `abc123def456` |
+
+---
+
+## 📌 Casos de uso típicos
+
+### Tienda online: Encontrar reclamaciones sobre envíos
+
+```bash
+python main.py --keywords "envío,retraso,no llegó,dañado,perdido" \
+               --preset-range last_week \
+               --only-descontento
+```
+
+### SaaS: Feedback de usuarios frustrados
+
+```bash
+python main.py --to support@empresa.com \
+               --preset-range last_month \
+               --only-descontento \
+               --min-score 0.80
+```
+
+### E-commerce: Análisis mensual completo
+
+```bash
+python main.py --preset-range last_month \
+               --max-emails 1000 \
+               --keywords "pedidos,devoluciones,tallas,calidad"
+```
+
+### Auditoría: Todos los correos del año pasado
+
+```bash
+python main.py --from-date 2025-01-01 \
+               --max-emails 50000
+```
+
+---
+
+## 🎯 Entender el "Score" de descontento
+
+El **score** es un número de **0.0 a 1.0** que indica la confianza del análisis:
+
+- **0.0 - 0.33**: Débil (poco probable que sea ese sentimiento)
+- **0.33 - 0.66**: Moderado (podría ser ese sentimiento)
+- **0.66 - 1.0**: Fuerte (altamente probable que sea ese sentimiento)
+
+¿Por qué `MIN_SCORE_DESCONTENTO=0.60` por defecto?
+- Capta descontentos claros pero no los ambiguos
+- Reduce falsos positivos
+- Puedes ajustar:
+  - **Más estricto** (menos ruido): `--min-score 0.80`
+  - **Más permisivo** (más cobertura): `--min-score 0.50`
+
+---
+
+## ⚠️ Consideraciones importantes
+
+### Privacidad y seguridad
+
+El contenido de los emails se envía a OpenAI para análisis.
+
+- Revisa políticas de privacidad de OpenAI
+- Consulta con team legal si usas datos sensibles
+- Considera anonimizar información antes de procesar
+
+### Costos
+
+- **OpenAI**: ~$0.00001 por token. Con 1000 emails: ~$0.50-$2 (depende del modelo)
+- **Google Gmail API**: 1M requests/día (gratis)
+- Usa `gpt-4o-mini` para máxima economía
+
+### Rendimiento
+
+- 100 emails: ~2 minutos
+- 1000 emails: ~20 minutos
+- 10000 emails: ~3-4 horas (según modelo)
+
+---
+
+## 🛠️ Desarrollo y Testing
+
+```bash
+# Instalar con dependencias de test
+pip install -r requirements.txt
+
+# Ejecutar tests
+make test
+
+# Ver cobertura
+make test-coverage
+
+# Lint del código
+make lint
+```
+
+---
+
+## 📖 Requisitos técnicos
+
+- Python 3.10+
+- Google Workspace con Gmail API habilitada
+- Cuenta OpenAI con API keys
+
+---
+
+## 🤝 Contribuciones
+
+Las contribuciones son bienvenidas. El proyecto sigue arquitectura hexagonal y SOLID principles.
+
+---
+
+## 📄 Licencia
+
+Ver [LICENSE](LICENSE)

@@ -44,6 +44,7 @@ class TestClientSatisfactionPipeline:
         assert pipeline.sentiment_analyzer is mock_sentiment_analyzer
         assert pipeline.output_dir == "output"
         assert pipeline.csv_prefix == "clients"
+        assert pipeline.min_score_descontento == 0.60
 
     def test_pipeline_custom_config(self, mock_email_source, mock_sentiment_analyzer):
         """Debe crear pipeline con configuración personalizada"""
@@ -52,10 +53,12 @@ class TestClientSatisfactionPipeline:
             sentiment_analyzer=mock_sentiment_analyzer,
             output_dir="custom_output",
             csv_prefix="custom_prefix",
+            min_score_descontento=0.75,
         )
 
         assert pipeline.output_dir == "custom_output"
         assert pipeline.csv_prefix == "custom_prefix"
+        assert pipeline.min_score_descontento == 0.75
 
     def test_ensure_output_dir_creates_directory(
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
@@ -277,6 +280,65 @@ class TestClientSatisfactionPipeline:
 
         # Verificar que se pasó max_results=5 al source
         mock_email_source.list_email_ids.assert_called_once_with(max_results=5)
+
+    def test_run_only_descontento_with_min_score(
+        self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
+    ):
+        """Pipeline debe filtrar por score mínimo cuando --only-descontento está activo"""
+        emails = [
+            Email(
+                id="email_1",
+                thread_id="thread_1",
+                sender="cliente1@example.com",
+                subject="Muy descontento",
+                date="2026-03-31",
+                body="Muy insatisfecho",
+            ),
+            Email(
+                id="email_2",
+                thread_id="thread_2",
+                sender="cliente2@example.com",
+                subject="Poco descontento",
+                date="2026-03-31",
+                body="Algo insatisfecho",
+            ),
+            Email(
+                id="email_3",
+                thread_id="thread_3",
+                sender="cliente3@example.com",
+                subject="Contento",
+                date="2026-03-31",
+                body="Muy contento",
+            ),
+        ]
+
+        sentiments = [
+            SentimentResult("descontento", 0.92, "muy insatisfecho"),  # >= 0.80, se incluye
+            SentimentResult("descontento", 0.45, "algo insatisfecho"),  # < 0.80, se excluye
+            SentimentResult("contento", 0.90, "contento"),  # No es descontento
+        ]
+
+        mock_email_source.list_email_ids.return_value = ["email_1", "email_2", "email_3"]
+        mock_email_source.fetch_email.side_effect = emails
+        mock_sentiment_analyzer.analyze.side_effect = sentiments
+
+        pipeline = ClientSatisfactionPipeline(
+            email_source=mock_email_source,
+            sentiment_analyzer=mock_sentiment_analyzer,
+            output_dir=temp_output_dir,
+            min_score_descontento=0.80,
+        )
+
+        csv_path = pipeline.run(max_emails=10, only_descontento=True)
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+            # Solo debe incluir email_1 (descontento con score 0.92 >= 0.80)
+            assert len(rows) == 1
+            assert rows[0]["sentimiento"] == "descontento"
+            assert rows[0]["remitente"] == "cliente1@example.com"
+            assert float(rows[0]["score"]) == 0.92
 
     def test_run_returns_csv_path(
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
