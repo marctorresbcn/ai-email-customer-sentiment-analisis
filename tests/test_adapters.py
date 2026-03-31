@@ -132,7 +132,7 @@ class TestOpenAISentimentAnalyzer:
     @patch("openai_classifier.setup_openai")
     def test_sentiment_analyzer_creation(self, mock_setup):
         """Debe crear OpenAISentimentAnalyzer correctamente"""
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
 
         assert analyzer.model == "gpt-4o-mini"
         assert analyzer.max_tokens == 250
@@ -149,7 +149,7 @@ class TestOpenAISentimentAnalyzer:
             "evidencia": "muy insatisfecho con el servicio",
         }
 
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
         result = analyzer.analyze("Estoy muy insatisfecho con el servicio")
 
         assert isinstance(result, SentimentResult)
@@ -167,7 +167,7 @@ class TestOpenAISentimentAnalyzer:
             "evidencia": "muy satisfecho",
         }
 
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
         result = analyzer.analyze("Estoy muy satisfecho con el servicio")
 
         assert result.sentimiento == "contento"
@@ -183,7 +183,7 @@ class TestOpenAISentimentAnalyzer:
             "evidencia": "sin indicador claro",
         }
 
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
         result = analyzer.analyze("Aquí está tu información")
 
         assert result.sentimiento == "neutral"
@@ -198,7 +198,7 @@ class TestOpenAISentimentAnalyzer:
             # Score y evidencia faltan
         }
 
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
         result = analyzer.analyze("texto de prueba")
 
         assert result.sentimiento == "neutral"
@@ -234,7 +234,7 @@ class TestOpenAISentimentAnalyzer:
             "evidencia": "texto vacío",
         }
 
-        analyzer = OpenAISentimentAnalyzer(api_key="test_key")
+        analyzer = OpenAISentimentAnalyzer(api_key="test_key", model="gpt-4o-mini")
         result = analyzer.analyze("")
 
         assert result.sentimiento == "neutral"

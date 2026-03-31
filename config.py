@@ -7,6 +7,7 @@ load_dotenv()
 @dataclass
 class Settings:
     openai_api_key: str
+    openai_model: str
     gmail_credentials_file: str
     gmail_token_file: str
     gmail_user_id: str
@@ -22,6 +23,7 @@ class Settings:
 def load_settings() -> Settings:
     return Settings(
         openai_api_key=os.getenv("OPENAI_API_KEY", "").strip(),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         gmail_credentials_file=os.getenv("GMAIL_CREDENTIALS_FILE", "credentials.json"),
         gmail_token_file=os.getenv("GMAIL_TOKEN_FILE", "token.json"),
         gmail_user_id=os.getenv("GMAIL_USER_ID", "me"),

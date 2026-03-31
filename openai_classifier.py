@@ -4,7 +4,7 @@ from domain import SentimentResult
 
 
 class OpenAISentimentAnalyzer:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini", max_tokens: int = 250, temperature: float = 0.0):
+    def __init__(self, api_key: str, model: str, max_tokens: int = 250, temperature: float = 0.0):
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature

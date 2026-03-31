@@ -82,7 +82,7 @@ def main() -> None:
 
     sentiment_analyzer = OpenAISentimentAnalyzer(
         api_key=settings.openai_api_key,
-        model="gpt-4o-mini",
+        model=settings.openai_model,
     )
 
     pipeline = ClientSatisfactionPipeline(
