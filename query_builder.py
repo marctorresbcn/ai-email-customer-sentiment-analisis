@@ -98,6 +98,29 @@ class GmailQueryBuilder:
         self.conditions.append(f"to:{email}")
         return self
 
+    def add_keywords(self, keywords: list[str]) -> "GmailQueryBuilder":
+        """
+        Agrega condición: palabras clave en asunto o contenido.
+        
+        Args:
+            keywords: Lista de palabras clave para buscar (ej: ["pedidos", "devoluciones"])
+            
+        Returns:
+            self para encadenamiento.
+        """
+        if not keywords:
+            return self
+        
+        # Normalizar: minúsculas y limpiar espacios
+        normalized_keywords = [k.strip().lower() for k in keywords if k.strip()]
+        if not normalized_keywords:
+            return self
+        
+        # Construir query: OR en asunto (subject:palabra1 OR subject:palabra2)
+        keyword_query = " OR ".join([f'subject:"{k}"' for k in normalized_keywords])
+        self.conditions.append(f"({keyword_query})")
+        return self
+
     def build(self) -> str:
         """
         Construye la query final.

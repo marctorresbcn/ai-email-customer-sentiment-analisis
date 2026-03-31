@@ -46,6 +46,14 @@ def main() -> None:
         default=None,
     )
     
+    # Filtro de palabras clave
+    parser.add_argument(
+        "--keywords",
+        type=str,
+        help="Palabras clave separadas por comas para filtrar (ej: 'pedidos,devoluciones,tallas')",
+        default=None,
+    )
+    
     args = parser.parse_args()
 
     settings = load_settings()
@@ -69,6 +77,14 @@ def main() -> None:
     
     if args.to:
         query_builder.add_recipient(args.to)
+    
+    # Procesar palabras clave desde CLI o .env
+    if args.keywords:
+        keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
+        if keywords:
+            query_builder.add_keywords(keywords)
+    elif settings.keywords_filter:
+        query_builder.add_keywords(settings.keywords_filter)
     
     final_query = query_builder.build()
 

@@ -51,6 +51,7 @@ Después de copiar `.env.example` a `.env`, edita los valores según tu entorno.
 |----------|-----------|-------------|---------|
 | `MAX_EMAILS` | ⚠️ Opcional | Número máximo de correos a procesar por defecto. Puede ser sobrescrito con `--max-emails` CLI | `100` |
 | `MIN_SCORE_DESCONTENTO` | ⚠️ Opcional | Score mínimo (0.0 a 1.0) para considerar un email como "descontento". Valores cercanos a 1.0 son más estrictos | `0.60` |
+| `KEYWORDS_FILTER` | ⚠️ Opcional | Palabras clave separadas por comas para filtrar correos. Solo se procesan correos cuyo asunto coincida con estas palabras. Útil para descartar categorías no relevantes (ej: facturas, confirmaciones automáticas). Se puede sobrescribir con `--keywords` en CLI | `pedidos,devoluciones,tallas,returns,exchange` |
 
 ### Output Configuration
 
@@ -82,6 +83,7 @@ GMAIL_QUERY=
 # Processing
 MAX_EMAILS=100
 MIN_SCORE_DESCONTENTO=0.60
+KEYWORDS_FILTER=pedidos,devoluciones,tallas,returns,exchange
 
 # Output
 OUTPUT_DIR=output
@@ -129,6 +131,20 @@ Puedes usar uno de los siguientes filtros (mutuamente excluyentes):
   python main.py --to support@empresa.com
   ```
 
+### Filtro de palabras clave
+
+- `--keywords palabra1,palabra2,palabra3`: filtra correos cuyo asunto contiene estas palabras clave. Útil para descartar categorías no relevantes (ej: facturas, confirmaciones automáticas) y enfocarse solo en la comunicación relacionada con satisfacción del cliente.
+  ```bash
+  python main.py --keywords pedidos,devoluciones,tallas,returns,exchange
+  ```
+
+**Ejemplo para tienda barefoot:** Filtra solo correos sobre pedidos, cambios, devoluciones y problemas de talla:
+```bash
+python main.py --keywords "pedidos,cambios,devoluciones,returns,exchange,tallas,reclamación,problema envío" --max-emails 300
+```
+
+**Nota:** Las palabras clave también pueden configurarse en el archivo `.env` con la variable `KEYWORDS_FILTER`. Si se especifican tanto en `.env` como en CLI, prevalece el valor de CLI.
+
 ### Filtro de sentimiento
 
 - `--only-descontento`: exporta solo correos clasificados como descontento.
@@ -157,15 +173,15 @@ Los filtros se pueden combinar de la siguiente manera:
 |-------------|---------|--------|
 | **Fecha + Destinatario** | `--preset-range last_month --to support@empresa.com` | ✅ Permitido |
 | **Fecha + Máximo emails** | `--from-date 2026-01-01 --max-emails 100` | ✅ Permitido |
-| **Fecha + Solo descontentos** | `--date-range 2026-03-01 2026-03-31 --only-descontento` | ✅ Permitido |
+| **Fecha + Palabras clave** | `--date-range 2026-03-01 2026-03-31 --keywords pedidos,devoluciones` | ✅ Permitido |
+| **Palabras clave + Destinatario** | `--keywords tallas,returns --to support@empresa.com` | ✅ Permitido |
+| **Palabras clave + Solo descontentos** | `--keywords pedidos,envío --only-descontento` | ✅ Permitido |
 | **Destinatario + Máximo** | `--to sales@empresa.com --max-emails 50` | ✅ Permitido |
-| **Múltiples flags** | `--preset-range last_week --to alias@empresa.com --max-emails 200 --only-descontento` | ✅ Permitido |
+| **Múltiples flags complejos** | `--preset-range last_week --to support@empresa.com --keywords pedidos,devoluciones --max-emails 500 --only-descontento` | ✅ Permitido |
 
 **Nota:** Los filtros de fecha son mutuamente excluyentes (solo uno a la vez). No se pueden combinar `--from-date`, `--date-range` y `--preset-range` entre sí.
 
 ---
-
-## Obtener TODOS los correos de la cuenta
 
 Si deseas procesar **todos los correos** de tu buzón (sin filtros específicos), tienes dos opciones:
 

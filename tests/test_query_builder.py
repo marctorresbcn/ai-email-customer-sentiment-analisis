@@ -129,3 +129,52 @@ class TestGmailQueryBuilder:
         week_ago = today - timedelta(days=7)
         expected_date = week_ago.strftime("%Y/%m/%d")
         assert f"after:{expected_date}" in result
+
+    def test_add_keywords_single(self):
+        """Test: agregar una palabra clave."""
+        qb = GmailQueryBuilder()
+        qb.add_keywords(["pedidos"])
+        result = qb.build()
+        assert 'subject:"pedidos"' in result
+
+    def test_add_keywords_multiple(self):
+        """Test: agregar múltiples palabras clave."""
+        qb = GmailQueryBuilder()
+        qb.add_keywords(["pedidos", "devoluciones", "tallas"])
+        result = qb.build()
+        assert 'subject:"pedidos"' in result
+        assert 'subject:"devoluciones"' in result
+        assert 'subject:"tallas"' in result
+        assert " OR " in result
+
+    def test_add_keywords_empty_list(self):
+        """Test: lista vacía de palabras clave."""
+        qb = GmailQueryBuilder()
+        qb.add_keywords([])
+        assert qb.build() == ""
+
+    def test_add_keywords_with_spaces(self):
+        """Test: palabras clave con espacios en blanco."""
+        qb = GmailQueryBuilder()
+        qb.add_keywords(["  exchange  ", "returns"])
+        result = qb.build()
+        assert 'subject:"exchange"' in result
+        assert 'subject:"returns"' in result
+
+    def test_add_keywords_lowercase_normalization(self):
+        """Test: las palabras clave se normalizan a minúsculas."""
+        qb = GmailQueryBuilder()
+        qb.add_keywords(["PEDIDOS", "Devoluciones"])
+        result = qb.build()
+        assert 'subject:"pedidos"' in result
+        assert 'subject:"devoluciones"' in result
+
+    def test_keywords_combined_with_other_filters(self):
+        """Test: palabras clave combinadas con otros filtros."""
+        qb = GmailQueryBuilder()
+        qb.add_from_date("2026-03-01").add_keywords(["pedidos", "devoluciones"]).add_recipient("support@empresa.com")
+        result = qb.build()
+        assert "after:2026/03/01" in result
+        assert 'subject:"pedidos"' in result
+        assert 'subject:"devoluciones"' in result
+        assert "to:support@empresa.com" in result
