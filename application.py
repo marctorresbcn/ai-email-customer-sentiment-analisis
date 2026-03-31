@@ -22,6 +22,50 @@ class ClientSatisfactionPipeline:
         filename = f"{self.csv_prefix}_{ts}.csv"
         return os.path.join(self.output_dir, filename)
 
+    def dry_run(self, max_emails: int) -> None:
+        """Vista previa sin procesar con OpenAI (sin costo)."""
+        print("\n" + "=" * 80)
+        print("🔍 DRY-RUN MODE: Validación de filtros (SIN llamar a OpenAI)")
+        print("=" * 80 + "\n")
+
+        try:
+            email_ids = self.email_source.list_email_ids(max_results=max_emails)
+        except Exception as e:
+            print(f"❌ Error al conectar con Gmail: {e}\n")
+            raise
+
+        if not email_ids:
+            print("❌ No se encontraron emails con los filtros especificados.\n")
+            return
+
+        print(f"✅ Total emails encontrados: {len(email_ids)}")
+        print(f"📊 Mostrando preview de los primeros 10:\n")
+        print("-" * 80)
+
+        for idx, email_id in enumerate(email_ids[:10], start=1):
+            try:
+                email = self.email_source.fetch_email(email_id)
+                body_preview = (
+                    (email.body[:120].replace("\n", " ").strip() + "...")
+                    if email.body
+                    else "<vacío>"
+                )
+
+                print(f"{idx}. [{email.date}]")
+                print(f"   De: {email.sender}")
+                print(f"   Asunto: {email.subject or '<sin asunto>'}")
+                print(f"   Preview: {body_preview}")
+                print()
+            except Exception as e:
+                print(f"{idx}. ❌ Error procesando email: {e}\n")
+
+        print("-" * 80)
+        if len(email_ids) > 10:
+            print(f"... y {len(email_ids) - 10} emails más\n")
+
+        print("Próximo paso: ejecuta sin --dry-run para procesar con OpenAI y generar CSV\n")
+        print("=" * 80 + "\n")
+
     def run(self, max_emails: int, only_descontento: bool = False) -> str:
         email_ids = self.email_source.list_email_ids(max_results=max_emails)
 

@@ -46,6 +46,64 @@ class TestClientSatisfactionPipeline:
         assert pipeline.csv_prefix == "clients"
         assert pipeline.min_score_descontento == 0.60
 
+    def test_dry_run_with_emails(self, mock_email_source, mock_sentiment_analyzer, capsys):
+        """Test que dry_run muestra preview sin procesar con IA."""
+        mock_emails = [
+            Email(
+                id="1",
+                thread_id="t1",
+                date="2026-03-25",
+                sender="cliente1@test.com",
+                subject="Mi pedido",
+                body="El envío tardó mucho"
+            ),
+            Email(
+                id="2",
+                thread_id="t2",
+                date="2026-03-24",
+                sender="cliente2@test.com",
+                subject="Duda talla",
+                body="¿Qué talla me recomiendas?"
+            ),
+        ]
+        mock_email_source.list_email_ids.return_value = ["1", "2"]
+        mock_email_source.fetch_email.side_effect = mock_emails
+
+        pipeline = ClientSatisfactionPipeline(
+            email_source=mock_email_source,
+            sentiment_analyzer=mock_sentiment_analyzer
+        )
+
+        # dry_run no debe lanzar excepción
+        pipeline.dry_run(max_emails=100)
+
+        # Verifica que se llamó a list_email_ids pero NO a sentiment_analyzer
+        mock_email_source.list_email_ids.assert_called_once_with(max_results=100)
+        mock_sentiment_analyzer.analyze.assert_not_called()  # ← NO llama a OpenAI
+        
+        # Verifica que se mostró el preview en consola
+        captured = capsys.readouterr()
+        assert "DRY-RUN MODE" in captured.out
+        assert "Total emails encontrados: 2" in captured.out
+
+    def test_dry_run_no_emails(self, mock_email_source, mock_sentiment_analyzer, capsys):
+        """Test que dry_run maneja caso de sin emails."""
+        mock_email_source.list_email_ids.return_value = []
+
+        pipeline = ClientSatisfactionPipeline(
+            email_source=mock_email_source,
+            sentiment_analyzer=mock_sentiment_analyzer
+        )
+
+        # dry_run no debe lanzar excepción
+        pipeline.dry_run(max_emails=100)
+
+        mock_sentiment_analyzer.analyze.assert_not_called()
+        
+        # Verifica que mostró mensaje de no encontrados
+        captured = capsys.readouterr()
+        assert "No se encontraron emails" in captured.out
+
     def test_pipeline_custom_config(self, mock_email_source, mock_sentiment_analyzer):
         """Debe crear pipeline con configuración personalizada"""
         pipeline = ClientSatisfactionPipeline(

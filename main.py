@@ -60,6 +60,13 @@ def main() -> None:
         default=None,
     )
     
+    # Validación / Dry-run
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Modo validación: muestra preview de emails sin procesar (sin costo de OpenAI)",
+    )
+    
     args = parser.parse_args()
 
     settings = load_settings()
@@ -90,7 +97,7 @@ def main() -> None:
         query_builder.add_recipient(args.to)
     
     # Procesar palabras clave desde CLI o .env
-    if args.keywords:
+    if args.keywords is not None:
         keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
         if keywords:
             query_builder.add_keywords(keywords)
@@ -120,7 +127,10 @@ def main() -> None:
         min_score_descontento=settings.min_score_descontento,
     )
 
-    pipeline.run(max_emails=settings.max_emails, only_descontento=args.only_descontento)
+    if args.dry_run:
+        pipeline.dry_run(max_emails=settings.max_emails)
+    else:
+        pipeline.run(max_emails=settings.max_emails, only_descontento=args.only_descontento)
 
 
 if __name__ == "__main__":
