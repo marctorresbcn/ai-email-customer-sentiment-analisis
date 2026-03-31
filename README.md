@@ -69,6 +69,20 @@ python main.py --date-range 2026-03-01 2026-03-31 --only-descontento
 python main.py --from-date 2026-01-01 --to sales@empresa.com
 ```
 
+### Combinación de filtros
+
+Los filtros se pueden combinar de la siguiente manera:
+
+| Combinación | Ejemplo | Estado |
+|-------------|---------|--------|
+| **Fecha + Destinatario** | `--preset-range last_month --to support@empresa.com` | ✅ Permitido |
+| **Fecha + Máximo emails** | `--from-date 2026-01-01 --max-emails 100` | ✅ Permitido |
+| **Fecha + Solo descontentos** | `--date-range 2026-03-01 2026-03-31 --only-descontento` | ✅ Permitido |
+| **Destinatario + Máximo** | `--to sales@empresa.com --max-emails 50` | ✅ Permitido |
+| **Múltiples flags** | `--preset-range last_week --to alias@empresa.com --max-emails 200 --only-descontento` | ✅ Permitido |
+
+**Nota:** Los filtros de fecha son mutuamente excluyentes (solo uno a la vez). No se pueden combinar `--from-date`, `--date-range` y `--preset-range` entre sí.
+
 ### Salida
 
 El resultado se genera en:
