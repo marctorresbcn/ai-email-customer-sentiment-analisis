@@ -99,11 +99,14 @@ python main.py --from-date 2000-01-01 --max-emails 50000
 | `--keywords` | Texto | Palabras clave en asunto (separadas por comas) | `--keywords pedidos,returns,tallas` |
 | `--only-descontento` | Flag | Solo exportar clientes descontentos | (sin argumento) |
 | `--min-score` | Número | Score mínimo para "descontento" (0.0-1.0) | `--min-score 0.75` |
+| `--exclude-domains` | Texto | Dominios a excluir (separados por comas) | `--exclude-domains google.com,shopify.com` |
+| `--dry-run` | Flag | Preview de emails sin llamar a OpenAI (sin coste) | (sin argumento) |
 
 **Notas:**
 - Los rangos de **fecha son excluyentes** entre sí: usa solo uno (`--from-date` O `--date-range` O `--preset-range`)
 - Los demás parámetros pueden combinarse libremente
 - CLI sobrescribe valores del `.env`
+- `--dry-run` es ideal para validar filtros antes de un run real
 
 ---
 
@@ -124,7 +127,8 @@ python main.py --from-date 2000-01-01 --max-emails 50000
 | `MAX_EMAILS` | Máximo emails por ejecución | `100` |
 | `MIN_SCORE_DESCONTENTO` | Score mínimo para marcar como "descontento" (0.0-1.0) | `0.60` |
 | `KEYWORDS_FILTER` | Palabras clave para filtrar asuntos (comas separadas) | (vacío) |
-| `GMAIL_LABELS` | Carpetas a buscar (comas separadas) | `INBOX` |
+| `EXCLUDE_DOMAINS` | Dominios de remitente a excluir antes de llamar a OpenAI (ahorra coste) | (vacío) |
+| `GMAIL_LABELS` | Carpetas a buscar (comas separadas). Dejar vacío para buscar en todos los correos incluyendo archivados | `INBOX` |
 | `CSV_PREFIX` | Prefijo del archivo de salida | `clients` |
 
 ### Avanzadas
@@ -149,7 +153,8 @@ OPENAI_MODEL=gpt-4o-mini
 MAX_EMAILS=100
 MIN_SCORE_DESCONTENTO=0.60
 KEYWORDS_FILTER=pedidos,devoluciones,tallas,returns,exchange
-GMAIL_LABELS=INBOX
+EXCLUDE_DOMAINS=google.com,shopify.com,klaviyo.com
+GMAIL_LABELS=INBOX  # dejar vacío para incluir correos archivados
 
 # Output
 OUTPUT_DIR=output
