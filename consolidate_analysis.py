@@ -224,17 +224,14 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
     return critical_df.sort_values('score_promedio', ascending=False)
 
 def _make_timezone_naive(df: pd.DataFrame) -> pd.DataFrame:
-    """Convierte todas las columnas datetime a timezone-naive para Excel."""
+    """Convierte todas las columnas datetime a string ISO para Excel (evita problemas de timezone y formato)."""
     df = df.copy()
     for col in df.columns:
         try:
-            # Detectar si es una columna datetime
             if hasattr(df[col], 'dt'):
-                # Si tiene timezone, removerlo
-                if hasattr(df[col].dt, 'tz') and df[col].dt.tz is not None:
-                    # Crear sin timezone desde string
-                    df[col] = pd.to_datetime(df[col].astype(str).str.replace(r'\+\d{2}:\d{2}|\s[A-Z]{3}$', '', regex=True))
-        except Exception as e:
+                # Convertir datetime a string ISO
+                df[col] = pd.to_datetime(df[col], errors='coerce').dt.strftime('%Y-%m-%d %H:%M:%S')
+        except Exception:
             pass  # Ignorar columnas que no se pueden procesar
     return df
 
