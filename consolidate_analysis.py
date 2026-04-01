@@ -32,9 +32,8 @@ def load_all_csvs(folder_path: str) -> pd.DataFrame:
     dfs = [pd.read_csv(f) for f in csv_files]
     consolidated = pd.concat(dfs, ignore_index=True)
     
-    # Convertir fecha a datetime con formato flexible (y remover timezone)
-    consolidated['fecha_email'] = pd.to_datetime(consolidated['fecha_email'], utc=True, errors='coerce', format='mixed')
-    consolidated['fecha_email'] = consolidated['fecha_email'].dt.tz_localize(None)
+    # Convertir fecha a datetime (simple y robusto)
+    consolidated['fecha_email'] = pd.to_datetime(consolidated['fecha_email'], errors='coerce')
     
     # Remover duplicados por id_email (mantener el más reciente)
     consolidated = consolidated.sort_values('fecha_email').drop_duplicates(
@@ -82,7 +81,7 @@ def create_client_analysis(df: pd.DataFrame) -> pd.DataFrame:
         'score': ['min', 'max', 'mean'],
         'sentimiento': lambda x: (x == 'descontento').sum(),
         'fecha_email': ['min', 'max'],
-        'asunto': lambda x: ' | '.join(x.unique()[:3])  # Primeros 3 temas
+        'asunto': lambda x: ' | '.join([str(s) for s in x.unique()[:3] if pd.notna(s)])  # Primeros 3 temas sin NaN
     })
     
     # Aplanar los nombres de columnas multinivel
@@ -136,8 +135,9 @@ def create_client_analysis(df: pd.DataFrame) -> pd.DataFrame:
     
     # Limpiar columnas
     client_groups.loc[:, 'score_promedio'] = client_groups['score_promedio'].round(2)
-    client_groups.loc[:, 'primer_contacto'] = pd.to_datetime(client_groups['primer_contacto']).dt.strftime('%Y-%m-%d')
-    client_groups.loc[:, 'ultimo_contacto'] = pd.to_datetime(client_groups['ultimo_contacto']).dt.strftime('%Y-%m-%d')
+    # Convertir fechas de forma robusta (manejar timezone-aware)
+    client_groups.loc[:, 'primer_contacto'] = pd.to_datetime(client_groups['primer_contacto'], utc=True).dt.tz_localize(None).dt.strftime('%Y-%m-%d')
+    client_groups.loc[:, 'ultimo_contacto'] = pd.to_datetime(client_groups['ultimo_contacto'], utc=True).dt.tz_localize(None).dt.strftime('%Y-%m-%d')
     
     return client_groups.sort_values('score_promedio', ascending=False)
 
@@ -162,6 +162,9 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
     for remitente in df['remitente'].unique():
         client_emails = df[df['remitente'] == remitente].sort_values('fecha_email')
         
+        # Filtrar registros con fecha válida
+        client_emails = client_emails.dropna(subset=['fecha_email'])
+        
         if len(client_emails) < 2:
             continue
         
@@ -177,7 +180,7 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
                 'tendencia': 'Escalada' if client_emails['score'].iloc[-1] > client_emails['score'].iloc[-2] else 'Mejora',
                 'primer_contacto': client_emails['fecha_email'].min().strftime('%Y-%m-%d'),
                 'ultimo_contacto': client_emails['fecha_email'].max().strftime('%Y-%m-%d'),
-                'temas': ' | '.join(client_emails['asunto'].unique()[:3])
+                'temas': ' | '.join([str(s) for s in client_emails['asunto'].unique()[:3] if pd.notna(s)])
             })
         
         # Criterio 2: Escalada significativa (neutral → descontento)
@@ -192,7 +195,7 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
                 'tendencia': f"Subió de {scores[-2]:.1f} a {scores[-1]:.1f}",
                 'primer_contacto': client_emails['fecha_email'].min().strftime('%Y-%m-%d'),
                 'ultimo_contacto': client_emails['fecha_email'].max().strftime('%Y-%m-%d'),
-                'temas': ' | '.join(client_emails['asunto'].unique()[:3])
+                'temas': ' | '.join([str(s) for s in client_emails['asunto'].unique()[:3] if pd.notna(s)])
             })
         
         # Criterio 3: Alto promedio de scores
@@ -206,7 +209,7 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
                 'tendencia': '⚠️ Persistente',
                 'primer_contacto': client_emails['fecha_email'].min().strftime('%Y-%m-%d'),
                 'ultimo_contacto': client_emails['fecha_email'].max().strftime('%Y-%m-%d'),
-                'temas': ' | '.join(client_emails['asunto'].unique()[:3])
+                'temas': ' | '.join([str(s) for s in client_emails['asunto'].unique()[:3] if pd.notna(s)])
             })
     
     if not critical:
@@ -219,6 +222,21 @@ def create_critical_cases(df: pd.DataFrame) -> pd.DataFrame:
     critical_df = critical_df.drop_duplicates(subset=['remitente'], keep='first')
     
     return critical_df.sort_values('score_promedio', ascending=False)
+
+def _make_timezone_naive(df: pd.DataFrame) -> pd.DataFrame:
+    """Convierte todas las columnas datetime a timezone-naive para Excel."""
+    df = df.copy()
+    for col in df.columns:
+        try:
+            # Detectar si es una columna datetime
+            if hasattr(df[col], 'dt'):
+                # Si tiene timezone, removerlo
+                if hasattr(df[col].dt, 'tz') and df[col].dt.tz is not None:
+                    # Crear sin timezone desde string
+                    df[col] = pd.to_datetime(df[col].astype(str).str.replace(r'\+\d{2}:\d{2}|\s[A-Z]{3}$', '', regex=True))
+        except Exception as e:
+            pass  # Ignorar columnas que no se pueden procesar
+    return df
 
 
 def generate_excel_report(folder_path: str, output_file: str = None) -> str:
@@ -252,7 +270,18 @@ def generate_excel_report(folder_path: str, output_file: str = None) -> str:
     
     # Escribir Excel con múltiples hojas
     print(f"💾 Guardando en {output_file}...")
+    
+    # Asegurar que fecha_email es datetime naive antes de escribir
+    for df_to_write in [summary, client_analysis, critical if not critical.empty else None]:
+        if df_to_write is not None and 'fecha_email' in df_to_write.columns:
+            df_to_write['fecha_email'] = pd.to_datetime(df_to_write['fecha_email'], errors='coerce')
+    
     with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
+        # Convertir a timezone-naive antes de escribir
+        summary = _make_timezone_naive(summary)
+        client_analysis = _make_timezone_naive(client_analysis)
+        critical = _make_timezone_naive(critical) if not critical.empty else critical
+        
         summary.to_excel(writer, sheet_name='Todos los emails', index=False)
         client_analysis.to_excel(writer, sheet_name='Análisis por cliente', index=False)
         if not critical.empty:

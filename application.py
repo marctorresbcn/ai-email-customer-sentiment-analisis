@@ -132,7 +132,7 @@ class ClientSatisfactionPipeline:
                     {
                         "fecha_email": email.date,
                         "remitente": email.sender,
-                        "asunto": email.subject,
+                        "asunto": email.subject or "[Sin asunto]",
                         "sentimiento": sentiment_result.sentimiento,
                         "score": sentiment_result.score,
                         "evidencia": sentiment_result.evidencia,
