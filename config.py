@@ -14,6 +14,7 @@ class Settings:
     gmail_labels: list[str]
     gmail_query: str
     keywords_filter: list[str]
+    exclude_domains: list[str]
     max_emails: int
     output_dir: str
     csv_prefix: str
@@ -36,6 +37,7 @@ def load_settings() -> Settings:
         gmail_labels=[x.strip() for x in os.getenv("GMAIL_LABELS", "INBOX").split(",") if x.strip()],
         gmail_query=os.getenv("GMAIL_QUERY", "").strip(),
         keywords_filter=[x.strip().lower() for x in os.getenv("KEYWORDS_FILTER", "").split(",") if x.strip()],
+        exclude_domains=[x.strip().lower() for x in os.getenv("EXCLUDE_DOMAINS", "").split(",") if x.strip()],
         max_emails=int(os.getenv("MAX_EMAILS", "100")),
         output_dir=os.getenv("OUTPUT_DIR", "output"),
         csv_prefix=os.getenv("CSV_PREFIX", "clients"),

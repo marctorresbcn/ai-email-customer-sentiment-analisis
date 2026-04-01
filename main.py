@@ -60,6 +60,14 @@ def main() -> None:
         default=None,
     )
     
+    # Exclusión de dominios
+    parser.add_argument(
+        "--exclude-domains",
+        type=str,
+        help="Dominios a excluir separados por comas (ej: 'google.com,shopify.com')",
+        default=None,
+    )
+
     # Validación / Dry-run
     parser.add_argument(
         "--dry-run",
@@ -119,12 +127,19 @@ def main() -> None:
         model=settings.openai_model,
     )
 
+    # Resolver dominios excluidos: CLI tiene prioridad sobre .env
+    if args.exclude_domains is not None:
+        exclude_domains = [d.strip() for d in args.exclude_domains.split(",") if d.strip()]
+    else:
+        exclude_domains = settings.exclude_domains
+
     pipeline = ClientSatisfactionPipeline(
         email_source=email_source,
         sentiment_analyzer=sentiment_analyzer,
         output_dir=settings.output_dir,
         csv_prefix=settings.csv_prefix,
         min_score_descontento=settings.min_score_descontento,
+        exclude_domains=exclude_domains,
     )
 
     if args.dry_run:

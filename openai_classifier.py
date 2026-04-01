@@ -1,5 +1,5 @@
-import os
-import openai
+import json
+from openai import OpenAI
 from domain import SentimentResult
 
 
@@ -8,10 +8,10 @@ class OpenAISentimentAnalyzer:
         self.model = model
         self.max_tokens = max_tokens
         self.temperature = temperature
-        setup_openai(api_key)
+        self.client = OpenAI(api_key=api_key)
 
     def analyze(self, text: str) -> SentimentResult:
-        result = classify_sentiment(text, model=self.model)
+        result = classify_sentiment(self.client, text, model=self.model)
         return SentimentResult(
             sentimiento=result.get("sentimiento", "neutral"),
             score=result.get("score", 0.5),
@@ -19,21 +19,17 @@ class OpenAISentimentAnalyzer:
         )
 
 
-def setup_openai(api_key: str):
-    openai.api_key = api_key
-
-
-def classify_sentiment(text: str, model: str = "gpt-4o-mini") -> dict:
+def classify_sentiment(client: OpenAI, text: str, model: str = "gpt-4o-mini") -> dict:
     prompt = (
         "Eres un analista de satisfacción de clientes. "
         "En base al correo que sigue, responde estrictamente en formato JSON con las claves:\n"
         "- sentimiento: \"descontento\" o \"neutral\" o \"contento\"\n"
-        "- score: número entre 0.0 y 1.0\n"
+        "- score: número entre 0.0 y 1.0, donde 1.0 es máximo descontento y 0.0 es máxima satisfacción\n"
         "- evidencia: fragmento de texto que indique descontento (o explicative para neutral/contento)\n"
         "\nCorreo:\n" + text + "\n\nRespuesta JSON:\n"
     )
 
-    resp = openai.ChatCompletion.create(
+    resp = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": "Eres un clasificador de sentimiento de clientes."},
@@ -43,11 +39,14 @@ def classify_sentiment(text: str, model: str = "gpt-4o-mini") -> dict:
         max_tokens=250,
     )
 
-    raw = resp["choices"][0]["message"]["content"].strip()
+    raw = resp.choices[0].message.content.strip()
+
+    # Eliminar markdown code fences si el modelo las incluye
+    if raw.startswith("```"):
+        raw = raw.split("```")[-2] if raw.count("```") >= 2 else raw
+        raw = raw.lstrip("json").strip()
 
     # Intentar parsear JSON
-    import json
-
     try:
         parsed = json.loads(raw)
     except Exception:
@@ -58,11 +57,13 @@ def classify_sentiment(text: str, model: str = "gpt-4o-mini") -> dict:
             "evidencia": raw.replace("\n", " ").strip()[:512],
         }
 
-    # Normalizar
+    # Normalizar sentimiento
     sentimiento = str(parsed.get("sentimiento", "neutral")).lower()
     if sentimiento not in ["descontento", "neutral", "contento"]:
-        if "no" in sentimiento or "malo" in sentimiento or "queja" in sentimiento or "insatis" in sentimiento:
+        if any(w in sentimiento for w in ["negat", "malo", "queja", "insatis", "no "]):
             sentimiento = "descontento"
+        elif any(w in sentimiento for w in ["posit", "bien", "satisf", "feliz", "contento"]):
+            sentimiento = "contento"
         else:
             sentimiento = "neutral"
 

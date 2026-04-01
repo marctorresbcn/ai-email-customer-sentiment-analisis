@@ -7,12 +7,20 @@ from ports import EmailSource, SentimentAnalyzer
 
 
 class ClientSatisfactionPipeline:
-    def __init__(self, email_source: EmailSource, sentiment_analyzer: SentimentAnalyzer, output_dir: str = "output", csv_prefix: str = "clients", min_score_descontento: float = 0.60):
+    def __init__(self, email_source: EmailSource, sentiment_analyzer: SentimentAnalyzer, output_dir: str = "output", csv_prefix: str = "clients", min_score_descontento: float = 0.60, exclude_domains: list[str] | None = None):
         self.email_source = email_source
         self.sentiment_analyzer = sentiment_analyzer
         self.output_dir = output_dir
         self.csv_prefix = csv_prefix
         self.min_score_descontento = min_score_descontento
+        self.exclude_domains = [d.lower() for d in (exclude_domains or [])]
+
+    def _is_excluded(self, sender: str) -> bool:
+        sender_lower = sender.lower()
+        return any(
+            f"@{domain}" in sender_lower or f".{domain}" in sender_lower
+            for domain in self.exclude_domains
+        )
 
     def _ensure_output_dir(self) -> None:
         os.makedirs(self.output_dir, exist_ok=True)
@@ -38,30 +46,40 @@ class ClientSatisfactionPipeline:
             print("❌ No se encontraron emails con los filtros especificados.\n")
             return
 
+        if self.exclude_domains:
+            print(f"🚫 Dominios excluidos: {', '.join(self.exclude_domains)}")
+
         print(f"✅ Total emails encontrados: {len(email_ids)}")
-        print(f"📊 Mostrando preview de los primeros 10:\n")
+        print(f"📊 Mostrando preview de los primeros 10 (tras excluir dominios):\n")
         print("-" * 80)
 
-        for idx, email_id in enumerate(email_ids[:10], start=1):
+        shown = 0
+        excluded = 0
+        for email_id in email_ids:
+            if shown >= 10:
+                break
             try:
                 email = self.email_source.fetch_email(email_id)
+                if self._is_excluded(email.sender):
+                    excluded += 1
+                    continue
+                shown += 1
                 body_preview = (
                     (email.body[:120].replace("\n", " ").strip() + "...")
                     if email.body
                     else "<vacío>"
                 )
-
-                print(f"{idx}. [{email.date}]")
+                print(f"{shown}. [{email.date}]")
                 print(f"   De: {email.sender}")
                 print(f"   Asunto: {email.subject or '<sin asunto>'}")
                 print(f"   Preview: {body_preview}")
                 print()
             except Exception as e:
-                print(f"{idx}. ❌ Error procesando email: {e}\n")
+                print(f"❌ Error procesando email: {e}\n")
 
         print("-" * 80)
-        if len(email_ids) > 10:
-            print(f"... y {len(email_ids) - 10} emails más\n")
+        if excluded:
+            print(f"🚫 {excluded} emails omitidos por dominio excluido (en los primeros {shown + excluded} revisados)\n")
 
         print("Próximo paso: ejecuta sin --dry-run para procesar con OpenAI y generar CSV\n")
         print("=" * 80 + "\n")
@@ -90,6 +108,9 @@ class ClientSatisfactionPipeline:
 
             for idx, email_id in enumerate(email_ids, start=1):
                 email = self.email_source.fetch_email(email_id)
+                if self._is_excluded(email.sender):
+                    print(f"[{idx}/{len(email_ids)}] Omitido (dominio excluido): {email.sender}")
+                    continue
                 if not email.body.strip():
                     continue
 
