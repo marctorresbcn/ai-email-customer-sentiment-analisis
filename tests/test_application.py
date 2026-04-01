@@ -1,6 +1,7 @@
 import os
 import tempfile
 import csv
+import json
 import pytest
 from unittest.mock import Mock, MagicMock
 
@@ -33,6 +34,32 @@ def temp_output_dir():
 class TestClientSatisfactionPipeline:
     """Tests para ClientSatisfactionPipeline (caso de uso)"""
 
+    @staticmethod
+    def _get_generated_export_paths(execution_folder: str) -> tuple[str, str]:
+        generated_files = os.listdir(execution_folder)
+        csv_files = [f for f in generated_files if f.endswith(".csv")]
+        json_files = [f for f in generated_files if f.endswith(".json")]
+
+        assert len(csv_files) == 1
+        assert len(json_files) == 1
+
+        return (
+            os.path.join(execution_folder, csv_files[0]),
+            os.path.join(execution_folder, json_files[0]),
+        )
+
+    @staticmethod
+    def _read_export_rows(execution_folder: str) -> tuple[list[dict[str, str]], list[dict[str, str | float]]]:
+        csv_path, json_path = TestClientSatisfactionPipeline._get_generated_export_paths(execution_folder)
+
+        with open(csv_path, "r", encoding="utf-8") as f:
+            csv_rows = list(csv.DictReader(f))
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            json_rows = json.load(f)
+
+        return csv_rows, json_rows
+
     def test_pipeline_creation(self, mock_email_source, mock_sentiment_analyzer):
         """Debe crear pipeline correctamente"""
         pipeline = ClientSatisfactionPipeline(
@@ -42,7 +69,8 @@ class TestClientSatisfactionPipeline:
 
         assert pipeline.email_source is mock_email_source
         assert pipeline.sentiment_analyzer is mock_sentiment_analyzer
-        assert pipeline.output_dir == "output"
+        assert pipeline.base_output_dir == "output"
+        assert pipeline.output_dir.startswith("output/")
         assert pipeline.csv_prefix == "clients"
         assert pipeline.min_score_descontento == 0.60
 
@@ -114,7 +142,8 @@ class TestClientSatisfactionPipeline:
             min_score_descontento=0.75,
         )
 
-        assert pipeline.output_dir == "custom_output"
+        assert pipeline.base_output_dir == "custom_output"
+        assert pipeline.output_dir.startswith("custom_output/")
         assert pipeline.csv_prefix == "custom_prefix"
         assert pipeline.min_score_descontento == 0.75
 
@@ -166,13 +195,17 @@ class TestClientSatisfactionPipeline:
             output_dir=temp_output_dir,
         )
 
-        csv_path = pipeline.run(max_emails=10)
-
+        execution_folder = pipeline.run(max_emails=10)
+        csv_path, json_path = self._get_generated_export_paths(execution_folder)
         assert os.path.exists(csv_path)
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
             assert len(rows) == 0
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            rows = json.load(f)
+            assert rows == []
 
     def test_run_with_single_email_descontento(
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir, capsys
@@ -203,8 +236,8 @@ class TestClientSatisfactionPipeline:
             output_dir=temp_output_dir,
         )
 
-        csv_path = pipeline.run(max_emails=10)
-
+        execution_folder = pipeline.run(max_emails=10)
+        csv_path, json_path = self._get_generated_export_paths(execution_folder)
         assert os.path.exists(csv_path)
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -215,9 +248,68 @@ class TestClientSatisfactionPipeline:
             assert rows[0]["score"] == "0.95"
             assert rows[0]["evidencia"] == "muy insatisfecho"
 
+        with open(json_path, "r", encoding="utf-8") as f:
+            rows = json.load(f)
+            assert len(rows) == 1
+            assert rows[0]["sentimiento"] == "descontento"
+            assert rows[0]["remitente"] == "cliente@example.com"
+            assert rows[0]["score"] == 0.95
+            assert rows[0]["evidencia"] == "muy insatisfecho"
+
         captured = capsys.readouterr()
         assert "Problema con servicio" in captured.out
         assert "descontento" in captured.out
+
+    def test_run_with_ten_emails_generates_matching_csv_and_json(
+        self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
+    ):
+        """Pipeline debe exportar 10 emails al CSV y replicarlos en JSON."""
+        email_ids = [f"email_{idx}" for idx in range(1, 11)]
+        emails = [
+            Email(
+                id=email_id,
+                thread_id=f"thread_{idx}",
+                sender=f"cliente{idx}@example.com",
+                subject=f"Asunto {idx}",
+                date=f"2026-03-{idx:02d}T10:00:00Z",
+                body=f"Cuerpo del email {idx}",
+            )
+            for idx, email_id in enumerate(email_ids, start=1)
+        ]
+        sentiments = [
+            SentimentResult(
+                sentimiento="descontento" if idx % 2 == 0 else "neutral",
+                score=0.80 if idx % 2 == 0 else 0.55,
+                evidencia=f"Evidencia {idx}",
+            )
+            for idx in range(1, 11)
+        ]
+
+        mock_email_source.list_email_ids.return_value = email_ids
+        mock_email_source.fetch_email.side_effect = emails
+        mock_sentiment_analyzer.analyze.side_effect = sentiments
+
+        pipeline = ClientSatisfactionPipeline(
+            email_source=mock_email_source,
+            sentiment_analyzer=mock_sentiment_analyzer,
+            output_dir=temp_output_dir,
+        )
+
+        execution_folder = pipeline.run(max_emails=10)
+        csv_rows, json_rows = self._read_export_rows(execution_folder)
+
+        assert len(csv_rows) == 10
+        assert len(json_rows) == 10
+
+        for csv_row, json_row, email, sentiment in zip(csv_rows, json_rows, emails, sentiments):
+            assert csv_row["fecha_email"] == email.date == json_row["fecha_email"]
+            assert csv_row["remitente"] == email.sender == json_row["remitente"]
+            assert csv_row["asunto"] == email.subject == json_row["asunto"]
+            assert csv_row["sentimiento"] == sentiment.sentimiento == json_row["sentimiento"]
+            assert float(csv_row["score"]) == sentiment.score == json_row["score"]
+            assert csv_row["evidencia"] == sentiment.evidencia == json_row["evidencia"]
+            assert csv_row["id_email"] == email.id == json_row["id_email"]
+            assert csv_row["thread_id"] == email.thread_id == json_row["thread_id"]
 
     def test_run_only_descontento_filter(
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
@@ -266,7 +358,8 @@ class TestClientSatisfactionPipeline:
             output_dir=temp_output_dir,
         )
 
-        csv_path = pipeline.run(max_emails=10, only_descontento=True)
+        execution_folder = pipeline.run(max_emails=10, only_descontento=True)
+        csv_path, _ = self._get_generated_export_paths(execution_folder)
 
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -313,7 +406,8 @@ class TestClientSatisfactionPipeline:
             output_dir=temp_output_dir,
         )
 
-        csv_path = pipeline.run(max_emails=10)
+        execution_folder = pipeline.run(max_emails=10)
+        csv_path, _ = self._get_generated_export_paths(execution_folder)
 
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -326,7 +420,7 @@ class TestClientSatisfactionPipeline:
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
     ):
         """Pipeline debe respetar límite de emails"""
-        mock_email_source.list_email_ids.return_value = ["email_1", "email_2", "email_3"]
+        mock_email_source.list_email_ids.return_value = []
 
         pipeline = ClientSatisfactionPipeline(
             email_source=mock_email_source,
@@ -387,7 +481,8 @@ class TestClientSatisfactionPipeline:
             min_score_descontento=0.80,
         )
 
-        csv_path = pipeline.run(max_emails=10, only_descontento=True)
+        execution_folder = pipeline.run(max_emails=10, only_descontento=True)
+        csv_path, _ = self._get_generated_export_paths(execution_folder)
 
         with open(csv_path, "r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
@@ -401,7 +496,7 @@ class TestClientSatisfactionPipeline:
     def test_run_returns_csv_path(
         self, mock_email_source, mock_sentiment_analyzer, temp_output_dir
     ):
-        """Pipeline debe retornar ruta del CSV generado"""
+        """Pipeline debe retornar la carpeta de ejecución con el CSV generado"""
         mock_email_source.list_email_ids.return_value = []
 
         pipeline = ClientSatisfactionPipeline(
@@ -410,8 +505,9 @@ class TestClientSatisfactionPipeline:
             output_dir=temp_output_dir,
         )
 
-        csv_path = pipeline.run(max_emails=10)
+        execution_folder = pipeline.run(max_emails=10)
+        csv_path, _ = self._get_generated_export_paths(execution_folder)
 
-        assert isinstance(csv_path, str)
-        assert csv_path.endswith(".csv")
+        assert isinstance(execution_folder, str)
+        assert os.path.isdir(execution_folder)
         assert os.path.exists(csv_path)

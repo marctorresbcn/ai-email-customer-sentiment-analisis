@@ -77,6 +77,7 @@ python main.py --max-emails 50
 ```
 output/2026-04-01_143501/
 ├── clients_20260401_143501.csv          (emails procesados)
+├── clients_20260401_143501.json         (mismos emails en JSON)
 └── consolidado_evolucion.xlsx           (análisis automático 📊)
 ```
 
@@ -203,9 +204,11 @@ LOG_LEVEL=INFO
 
 ---
 
-## 📊 Estructura del CSV de salida
+## 📊 Estructura del export de salida
 
-**Ejemplo de archivo generado:** `output/clients_20260331_143501.csv`
+**Ejemplos de archivos generados:** `output/clients_20260331_143501.csv` y `output/clients_20260331_143501.json`
+
+El JSON replica exactamente los registros exportados al CSV de correos procesados, para reutilizarlos en otras herramientas sin necesidad de una exportación posterior.
 
 | Campo | Descripción | Ejemplo |
 |-------|-------------|---------|

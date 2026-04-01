@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 from datetime import datetime
 
@@ -33,6 +34,9 @@ class ClientSatisfactionPipeline:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.csv_prefix}_{ts}.csv"
         return os.path.join(self.output_dir, filename)
+
+    def _generate_json_path(self, csv_path: str) -> str:
+        return os.path.splitext(csv_path)[0] + ".json"
     
     def get_execution_folder(self) -> str:
         """Retorna la carpeta timestamped de esta ejecución."""
@@ -97,6 +101,8 @@ class ClientSatisfactionPipeline:
 
         self._ensure_output_dir()
         csv_path = self._generate_csv_path()
+        json_path = self._generate_json_path(csv_path)
+        exported_rows: list[dict[str, str | float]] = []
 
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
@@ -128,20 +134,24 @@ class ClientSatisfactionPipeline:
                     if sentiment_result.sentimiento != "descontento" or sentiment_result.score < self.min_score_descontento:
                         continue
 
-                writer.writerow(
-                    {
-                        "fecha_email": email.date,
-                        "remitente": email.sender,
-                        "asunto": email.subject or "[Sin asunto]",
-                        "sentimiento": sentiment_result.sentimiento,
-                        "score": sentiment_result.score,
-                        "evidencia": sentiment_result.evidencia,
-                        "id_email": email.id,
-                        "thread_id": email.thread_id,
-                    }
-                )
+                row = {
+                    "fecha_email": email.date,
+                    "remitente": email.sender,
+                    "asunto": email.subject or "[Sin asunto]",
+                    "sentimiento": sentiment_result.sentimiento,
+                    "score": sentiment_result.score,
+                    "evidencia": sentiment_result.evidencia,
+                    "id_email": email.id,
+                    "thread_id": email.thread_id,
+                }
+                writer.writerow(row)
+                exported_rows.append(row)
 
                 print(f"[{idx}/{len(email_ids)}] {email.subject or '<sin asunto>'} -> {sentiment_result.sentimiento} ({sentiment_result.score})")
 
+        with open(json_path, "w", encoding="utf-8") as f:
+            json.dump(exported_rows, f, ensure_ascii=False, indent=2)
+
         print(f"CSV generado: {csv_path}")
+        print(f"JSON generado: {json_path}")
         return self.output_dir
