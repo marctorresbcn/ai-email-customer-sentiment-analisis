@@ -98,6 +98,21 @@ class GmailQueryBuilder:
         self.conditions.append(f"to:{email}")
         return self
 
+    def add_sender(self, email: str) -> "GmailQueryBuilder":
+        """
+        Agrega condición: correos enviados desde un email específico.
+        
+        Args:
+            email: Dirección de email del remitente
+            
+        Returns:
+            self para encadenamiento.
+        """
+        if "@" not in email:
+            raise ValueError(f"Email inválido: {email}")
+        self.conditions.append(f"from:{email}")
+        return self
+
     def add_keywords(self, keywords: list[str]) -> "GmailQueryBuilder":
         """
         Agrega condición: palabras clave en asunto o contenido.

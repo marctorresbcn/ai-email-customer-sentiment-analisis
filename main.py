@@ -5,6 +5,7 @@ from config import load_settings
 from gmail_client import GmailEmailSource
 from openai_classifier import OpenAISentimentAnalyzer
 from query_builder import GmailQueryBuilder
+from consolidate_analysis import generate_excel_report
 
 
 def main() -> None:
@@ -49,6 +50,14 @@ def main() -> None:
         "--to",
         type=str,
         help="Correos dirigidos a un email específico (ej: alias@empresa.com)",
+        default=None,
+    )
+    
+    # Filtro de remitente
+    parser.add_argument(
+        "--sender",
+        type=str,
+        help="Correos enviados desde un email específico (ej: cliente@gmail.com)",
         default=None,
     )
     
@@ -104,6 +113,9 @@ def main() -> None:
     if args.to:
         query_builder.add_recipient(args.to)
     
+    if args.sender:
+        query_builder.add_sender(args.sender)
+    
     # Procesar palabras clave desde CLI o .env
     if args.keywords is not None:
         keywords = [k.strip() for k in args.keywords.split(",") if k.strip()]
@@ -145,7 +157,17 @@ def main() -> None:
     if args.dry_run:
         pipeline.dry_run(max_emails=settings.max_emails)
     else:
-        pipeline.run(max_emails=settings.max_emails, only_descontento=args.only_descontento)
+        execution_folder = pipeline.run(max_emails=settings.max_emails, only_descontento=args.only_descontento)
+        
+        # Generar automáticamente el reporte consolidado
+        print("\n" + "=" * 80)
+        print("📊 Generando reporte consolidado...")
+        print("=" * 80 + "\n")
+        try:
+            generate_excel_report(execution_folder)
+            print("\n✓ Análisis completado.\n")
+        except Exception as e:
+            print(f"\n⚠️ Error generando reporte consolidado: {e}\n")
 
 
 if __name__ == "__main__":

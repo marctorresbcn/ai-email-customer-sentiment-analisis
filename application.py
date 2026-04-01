@@ -10,10 +10,14 @@ class ClientSatisfactionPipeline:
     def __init__(self, email_source: EmailSource, sentiment_analyzer: SentimentAnalyzer, output_dir: str = "output", csv_prefix: str = "clients", min_score_descontento: float = 0.60, exclude_domains: list[str] | None = None):
         self.email_source = email_source
         self.sentiment_analyzer = sentiment_analyzer
-        self.output_dir = output_dir
+        self.base_output_dir = output_dir
         self.csv_prefix = csv_prefix
         self.min_score_descontento = min_score_descontento
         self.exclude_domains = [d.lower() for d in (exclude_domains or [])]
+        # Crear carpeta timestamped para esta ejecución
+        self.execution_timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        self.output_dir = os.path.join(output_dir, self.execution_timestamp)
+        self._ensure_output_dir()
 
     def _is_excluded(self, sender: str) -> bool:
         sender_lower = sender.lower()
@@ -29,6 +33,10 @@ class ClientSatisfactionPipeline:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{self.csv_prefix}_{ts}.csv"
         return os.path.join(self.output_dir, filename)
+    
+    def get_execution_folder(self) -> str:
+        """Retorna la carpeta timestamped de esta ejecución."""
+        return self.output_dir
 
     def dry_run(self, max_emails: int) -> None:
         """Vista previa sin procesar con OpenAI (sin costo)."""
@@ -136,4 +144,4 @@ class ClientSatisfactionPipeline:
                 print(f"[{idx}/{len(email_ids)}] {email.subject or '<sin asunto>'} -> {sentiment_result.sentimiento} ({sentiment_result.score})")
 
         print(f"CSV generado: {csv_path}")
-        return csv_path
+        return self.output_dir

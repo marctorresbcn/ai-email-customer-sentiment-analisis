@@ -22,10 +22,14 @@ class OpenAISentimentAnalyzer:
 def classify_sentiment(client: OpenAI, text: str, model: str = "gpt-4o-mini") -> dict:
     prompt = (
         "Eres un analista de satisfacción de clientes. "
-        "En base al correo que sigue, responde estrictamente en formato JSON con las claves:\n"
+        "Analiza el correo completo para determinar si el cliente expresa descontento, frustración o insatisfacción. "
+        "Considera el tono general, expresiones de enojo, quejas específicas, no solo menciones de demoras, devoluciones, reembolsos, returns o preguntas informativas sobre pedidos. "
+        "Quejas técnicas simples sobre la web/app (como enlaces rotos o problemas de acceso) sin expresiones de frustración intensa deben clasificarse como neutral con score bajo. "
+        "Preguntas simples sobre el estado del pedido, devoluciones, reembolsos o returns sin expresiones negativas deben clasificarse como neutral con score bajo. "
+        "Responde estrictamente en formato JSON con las claves:\n"
         "- sentimiento: \"descontento\" o \"neutral\" o \"contento\"\n"
-        "- score: número entre 0.0 y 1.0, donde 1.0 es máximo descontento y 0.0 es máxima satisfacción\n"
-        "- evidencia: fragmento de texto que indique descontento (o explicative para neutral/contento)\n"
+        "- score: número entre 0.0 y 1.0, donde 1.0 es máximo descontento (frustración intensa) y 0.0 es máxima satisfacción\n"
+        "- evidencia: fragmento de texto que justifique la clasificación, enfocándote en expresiones de sentimiento\n"
         "\nCorreo:\n" + text + "\n\nRespuesta JSON:\n"
     )
 
